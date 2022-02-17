@@ -5,6 +5,8 @@ import logging
 import os
 
 import numpy
+import matplotlib as mpl
+mpl.use('Agg')
 from matplotlib import pyplot
 
 if __name__ == '__main__':
@@ -38,10 +40,14 @@ if __name__ == '__main__':
         fig = pyplot.figure()
         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.1, 10, 0.5))
         pyplot.clabel(CS, inline=1, fontsize=8)
+        
+        out_fn = f"{args.result_folder}/{args.plot_prefix}_surface_2d_contour"
         fig.savefig(
-            f"{args.result_folder}/{args.plot_prefix}_surface_2d_contour", dpi=300,
+            out_fn, dpi=300,
             bbox_inches='tight'
         )
+        print("figure saved to: ", out_fn)
+
         pyplot.close()
 
     if args.trajectory_file:
@@ -58,10 +64,13 @@ if __name__ == '__main__':
         pyplot.tick_params('y', labelsize='x-large')
         pyplot.tick_params('x', labelsize='x-large')
 
+        out_fn = f"{args.result_folder}/{args.plot_prefix}_trajectory_2d"
         fig.savefig(
-            f"{args.result_folder}/{args.plot_prefix}_trajectory_2d", dpi=300,
+            out_fn, dpi=300,
             bbox_inches='tight'
         )
+        print("figure saved to: ", out_fn)
+
         pyplot.close()
 
     if args.surface_file and args.trajectory_file:
@@ -72,11 +81,23 @@ if __name__ == '__main__':
         ycoords = data["ycoordinates"]
         losses = data["losses"]
         acc = data["accuracies"]
-
+        print(losses)
+        breakpoint()
         X, Y = numpy.meshgrid(xcoords, ycoords, indexing="ij")
         Z = losses
         fig = pyplot.figure()
-        CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.1, 10, 0.5))
+#         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.1, 10, 0.5))
+#         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.0, 0.1, 0.01)) # exp1
+#         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(29, 40., 0.5))
+#         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(60, 70., 0.5))
+        
+#         CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.0, 0.5, 0.01)) # exp1  
+        CS = pyplot.contour(X, Y, Z, cmap='summer', levels=numpy.arange(0.0, 3, 0.5)) # exp1  
+
+
+#         print(CS)
+#         breakpoint()
+        
         pyplot.clabel(CS, inline=1, fontsize=8)
 
         data = numpy.load(f"{args.trajectory_file}")
@@ -89,8 +110,11 @@ if __name__ == '__main__':
         pyplot.tick_params('y', labelsize='x-large')
         pyplot.tick_params('x', labelsize='x-large')
 
+        out_fn = f"{args.result_folder}/{args.plot_prefix}_trajectory+contour_2d"
         fig.savefig(
-            f"{args.result_folder}/{args.plot_prefix}_trajectory+contour_2d", dpi=300,
+            out_fn, dpi=300,
             bbox_inches='tight'
         )
+        print("figure saved to: ", out_fn)
+
         pyplot.close()

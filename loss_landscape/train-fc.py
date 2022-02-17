@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 import dill
+import numpy as np
 import numpy.random
 import torch
 import torchvision
@@ -27,16 +28,16 @@ from utils.evaluations import get_loss_value
 from utils.linear_algebra import FrequentDirectionAccountant
 from utils.nn_manipulation import count_params, flatten_grads
 from utils.reproducibility import set_seed
-from utils.resnet import get_resnet
+from utils.fcnet import get_act_fn, get_fcnet
 from utils.misc import now2str
 
 # "Fixed" hyperparameters
 NUM_EPOCHS = 200
 # In the resnet paper they train for ~90 epoch before reducing LR, then 45 and 45 epochs.
 # We use 100-50-50 schedule here.
-LR = 0.1
+# LR = 0.01
 DATA_FOLDER = "../data/"
-
+IN_SHAPE = (3, 32, 32) #nc, h,w of an input image
 
 def get_dataloader(batch_size, train_size=None, test_size=None, transform_train_data=True):
     """
@@ -106,15 +107,22 @@ if __name__ == "__main__":
     # model related arguments
     parser.add_argument("--statefile", "-s", required=False, default=None)
     parser.add_argument(
-        "--model", required=True, choices=["resnet20", "resnet32", "resnet44", "resnet56"]
+        "--model", required=True, choices=["fcnet3", "fcnet5", "fcnet10"]
     )
-    parser.add_argument("--remove_skip_connections", action="store_true", default=False)
+    # parameters for fully-connected network
+    parser.add_argument("--n_hidden", required=True, type=int)
+    parser.add_argument(
+        "--act", required=True, choices=["relu", "leaky", "softplus"]
+    )
+    parser.add_argument("--use_bn", action="store_true", default=False)
     parser.add_argument(
         "--skip_bn_bias", action="store_true",
         help="whether to skip considering bias and batch norm params or not, Li et al do not consider bias and batch norm params"
     )
 
     parser.add_argument("--batch_size", required=False, type=int, default=128)
+    parser.add_argument("--lr", required=False, type=float, default=0.1)
+
     parser.add_argument(
         "--save_strategy", required=False, nargs="+", choices=["epoch", "init"],
         default=["epoch", "init"]
@@ -155,9 +163,20 @@ if __name__ == "__main__":
     train_loader, test_loader = get_dataloader(args.batch_size)
 
     # get model
-    model = get_resnet(args.model)(
-        num_classes=10, remove_skip_connections=args.remove_skip_connections
-    )
+    model_string = args.model
+    in_feats = int(np.prod(IN_SHAPE))
+    n_hidden = args.n_hidden
+    act_fn = get_act_fn(args.act)
+    use_bn = args.use_bn
+    model_args = {
+        'in_feats':in_feats,
+        'n_hidden': n_hidden,
+        'act_fn':act_fn,
+        'use_bn':use_bn
+    }
+    model = get_fcnet(model_string, **model_args)
+#     print('use bn: ', use_bn)
+#     print(model)
     model.to(args.device)
     logger.info(f"using {args.model} with {count_params(model)} parameters")
 
@@ -172,6 +191,7 @@ if __name__ == "__main__":
     fd_last_1 = FrequentDirectionAccountant(k=2, l=10, n=total_params, device=args.device)
 
     # use the same setup as He et al., 2015 (resnet)
+    LR = 0.1 if 'resnet' in model_string else args.lr 
     optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer=optimizer, lr_lambda=lambda x: 1 if x < 100 else (0.1 if x < 150 else 0.01)
@@ -273,3 +293,8 @@ if __name__ == "__main__":
         fds_save_dir/"buffer_last_1.npy",
         buffer=buffer.cpu().data.numpy(), direction1=directions[0], direction2=directions[1]
     )
+
+    
+# nohup python train-fc.py --gpu_id 2 --result_folder '../results/hw1-exp4-run1' --mode train  \
+# --model fcnet3 --n_hidden 64 --act relu \
+# --batch_size 128 --lr 1e-2 > ./training-logs/log-exp4-run1-fcnet_3-n_hidden_64-act_relu_bs_128.txt &

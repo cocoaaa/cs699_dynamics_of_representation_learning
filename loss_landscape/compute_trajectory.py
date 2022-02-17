@@ -14,6 +14,10 @@ import torch
 from utils.nn_manipulation import count_params, flatten_params
 from utils.reproducibility import set_seed
 from utils.resnet import get_resnet
+from utils.fcnet import get_act_fn, get_fcnet
+
+IN_SHAPE = (3, 32, 32) #nc, h,w of an input image
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -22,10 +26,19 @@ if __name__ == '__main__':
     parser.add_argument("--result_folder", "-r", required=True)
 
     # model related arguments
+    # cocoaaa: added fully-connected networks to the choices
     parser.add_argument("--statefile_folder", "-s", required=True)
     parser.add_argument(
-        "--model", required=True, choices=["resnet20", "resnet32", "resnet44", "resnet56"]
+        "--model", required=True, choices=["resnet20", "resnet32", "resnet44", "resnet56", \
+                                          "fcnet3", "fcnet5", "fcnet10"]
+    ) 
+    # model parameters for fully-connected network
+    parser.add_argument("--n_hidden", required=False, type=int)
+    parser.add_argument(
+        "--act", required=False, choices=["relu", "leaky", "softplus"], default='relu'
     )
+    parser.add_argument("--use_bn", action="store_true", default=False)
+    #  model params for resnet
     parser.add_argument("--remove_skip_connections", action="store_true", default=False)
     parser.add_argument("--skip_bn_bias", action="store_true")
 
@@ -48,9 +61,23 @@ if __name__ == '__main__':
     set_seed(args.seed)
 
     # get model
-    model = get_resnet(args.model)(
-        num_classes=10, remove_skip_connections=args.remove_skip_connections
-    )
+    if "resnet" in args.model:
+        model = get_resnet(args.model)(
+            num_classes=10, remove_skip_connections=args.remove_skip_connections
+        )
+    elif "fcnet" in args.model:
+        model_string = args.model
+        in_feats = int(numpy.prod(IN_SHAPE))
+        n_hidden = args.n_hidden
+        act_fn = get_act_fn(args.act)
+        use_bn = args.use_bn
+        model_args = {
+            'in_feats':in_feats,
+            'n_hidden': n_hidden,
+            'act_fn':act_fn,
+            'use_bn':use_bn
+        }
+        model = get_fcnet(model_string, **model_args)
     model.to("cpu")
     # since we will be mainly moving data so using cpu should be a better idea
     logger.info(f"using {args.model} with {count_params(model)} parameters")
